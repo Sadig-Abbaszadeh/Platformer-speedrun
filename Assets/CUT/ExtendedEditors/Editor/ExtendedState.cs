@@ -8,17 +8,16 @@ using UnityEngine;
 
 namespace DartsGames.Editors
 {
-    public class ExtendedState :  MonoscriptDrawState
+    public class ExtendedState : MonoscriptDrawState
     {
         #region Static
-        private static UnityEngine.Object _target;
         private static readonly int boxRightOffset = 25;
         #endregion
 
         // serialized object
         private SerializedObject so;
 
-        private List<MethodInfo> buttonMethods = new List<MethodInfo>();
+        private List<Button> buttonMethods = new List<Button>();
 
         // reg props
         private List<Property> regularProperties = new List<Property>();
@@ -39,46 +38,33 @@ namespace DartsGames.Editors
 
             DrawBoxes(width);
 
-            DrawButtons();
+            DrawButtons(width);
 
             so.ApplyModifiedProperties();
         }
 
         public override void Disable()
         {
-            Undo.undoRedoPerformed -= so.Update;
+            Undo.undoRedoPerformed -= SoUpdate;
         }
 
         // ctor
         /// <summary>
         /// Dont forget to call ondisable on the object on disable
         /// </summary>
-        public ExtendedState(UnityEngine.Object target, Type targetType, SerializedObject obj, Func<FieldInfo, bool> CanSerializeField, Func<MethodInfo, bool> CanSerializeMethod) : base(target)
+        public ExtendedState(UnityEngine.Object target, SerializedObject obj, Func<FieldInfo, bool> CanSerializeField, Func<MethodInfo, bool> CanSerializeMethod) : base(target)
         {
-            _target = target;
+            PrepareMain(target, obj, CanSerializeField, CanSerializeMethod);
+            Undo.undoRedoPerformed += SoUpdate;
+        }
 
-            so = obj;
+        public void Refresh(UnityEngine.Object target, SerializedObject obj, Func<FieldInfo, bool> CanSerializeField, Func<MethodInfo, bool> CanSerializeMethod)
+        {
+            buttonMethods.Clear();
+            regularProperties.Clear();
+            boxedProperties.Clear();
 
-            var allMethods = targetType.GetAllMethodsInAncestors(new List<Type>() { typeof(MonoBehaviour), typeof(ScriptableObject) });
-            var allFields = targetType.GetAllFieldsInAncestors(new List<Type>() { typeof(MonoBehaviour), typeof(ScriptableObject) });
-
-            // this will be subdivided into different collections, such that at the end this collection will have 0 elements because all
-            // will be inside their respective collections. 
-            var serializableFields = allFields.Where(f => so.FindProperty(f.Name) != null &&
-                !Attribute.IsDefined(f, typeof(HideInInspector)) &&
-                CanSerializeField(f)).ToList(); // as param
-
-            buttonMethods = allMethods.Where(m => m.GetParameters().Length == 0 &&
-                Attribute.IsDefined(m, typeof(InspectorButtonAttribute)) &&
-                CanSerializeMethod(m)).ToList();
-
-            PrepareBoxedFields(ref serializableFields, ref buttonMethods);
-
-            // add the leftover serialized fields to the regular props
-            foreach (var sf in serializableFields)
-                regularProperties.Add(new Property(so.FindProperty(sf.Name)));
-
-            Undo.undoRedoPerformed += so.Update;
+            PrepareMain(target, obj, CanSerializeField, CanSerializeMethod);
         }
 
         #region Draw Stuff
@@ -109,20 +95,52 @@ namespace DartsGames.Editors
             }
         }
 
-        private void DrawButtons()
+        private void DrawButtons(float width)
         {
             foreach (var m in buttonMethods)
-                if (GUILayout.Button(m.Name))
-                    m.Invoke(_target, null);
+                m.Draw(width);
         }
         #endregion
 
         #region Preparation
-        private void PrepareBoxedFields(ref List<FieldInfo> serializableFields, ref List<MethodInfo> buttons)
+        private void PrepareMain(UnityEngine.Object target, SerializedObject obj, Func<FieldInfo, bool> CanSerializeField, Func<MethodInfo, bool> CanSerializeMethod)
+        {
+            so = obj;
+            var targetType = target.GetType();
+
+            var allMethods = targetType.GetAllMethodsInAncestors(new List<Type>() { typeof(MonoBehaviour), typeof(ScriptableObject) });
+            var allFields = targetType.GetAllFieldsInAncestors(new List<Type>() { typeof(MonoBehaviour), typeof(ScriptableObject) });
+
+            // this will be subdivided into different collections, such that at the end this collection will have 0 elements because all
+            // will be inside their respective collections. 
+            var serializableFields = allFields.Where(f => so.FindProperty(f.Name) != null &&
+                !Attribute.IsDefined(f, typeof(HideInInspector)) &&
+                CanSerializeField(f)).ToList(); // as param
+
+            var usableMethods = allMethods.Where(m => m.GetParameters().Length == 0 &&
+                Attribute.IsDefined(m, typeof(InspectorButtonAttribute)) && CanSerializeMethod(m)).ToList();
+
+            // put stuff that should be in the boxes, into the boxes
+            PrepareBoxedFields(ref serializableFields, ref usableMethods, target);
+
+            // add the leftover serialized fields to the regular props
+            foreach (var sf in serializableFields)
+                regularProperties.Add(new Property(so.FindProperty(sf.Name)));
+
+            // make buttons from the leftover methods
+            buttonMethods = usableMethods.Select(method => new Button(method, target)).ToList();
+        }
+
+        private void SoUpdate()
+        {
+            so.Update();
+        }
+
+        private void PrepareBoxedFields(ref List<FieldInfo> serializableFields, ref List<MethodInfo> buttons, UnityEngine.Object target)
         {
             AddDrawableMember(ref serializableFields, f => new Property(so.FindProperty(f.Name)));
 
-            AddDrawableMember(ref buttons, b => new Button(b));
+            AddDrawableMember(ref buttons, b => new Button(b, target));
         }
 
         private void AddDrawableMember<T>(ref List<T> elements, Func<T, Drawable> addingFunction) where T : MemberInfo
@@ -175,17 +193,19 @@ namespace DartsGames.Editors
 
         public class Button : Drawable
         {
-            private MethodInfo method;
+            private Action action;
+            private GUIContent name;
 
-            public Button(MethodInfo method)
+            public Button(MethodInfo method, UnityEngine.Object target)
             {
-                this.method = method;
+                this.action = () => method.Invoke(target, null);
+                name = new GUIContent(method.Name);
             }
 
             public override void Draw(float width)
             {
-                if (GUILayout.Button(method.Name))
-                    method.Invoke(_target, default);
+                if (GUILayout.Button(name))
+                    action();
             }
         }
 

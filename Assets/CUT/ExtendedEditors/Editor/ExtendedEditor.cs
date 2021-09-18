@@ -17,13 +17,23 @@ namespace DartsGames.Editors
         {
             var t = target.GetType();
 
+            //
+
             // is extended editor
-            if (t.GetCustomAttribute(typeof(ExtendEditorAttribute)) != null)
+            if (Attribute.IsDefined(t, typeof(ExtendEditorAttribute)))
             {
-                state = new ExtendedState(target, t, serializedObject, CanSerializeField, CanSerializeMethod);
+                //if (Attribute.IsDefined(t, typeof(DesignerComponentAttribute)))
+                //{
+                //    DesignerObjectsHandler.OnDesignerModeChanged += DesignerModeChanged;
+                //    state = new ExtendedState(target, serializedObject, DesignerFieldCheck, DesignerMethodCheck);
+                //}
+                //else
+                {
+                    state = new ExtendedState(target, serializedObject, f => true, m => true);
+                }
             }
             // is custom drawable 
-            else if(target is ICustomPropertyDrawable cpd)
+            else if (target is ICustomPropertyDrawable cpd)
             {
                 state = new CGD_ButtonState(cpd);
             }
@@ -34,7 +44,20 @@ namespace DartsGames.Editors
             }
         }
 
-        private void OnDisable() => state.Disable();
+        private void DesignerModeChanged()
+        {
+            if (state is ExtendedState extendedState)
+            {
+                extendedState.Refresh(target, serializedObject, DesignerFieldCheck, DesignerMethodCheck);
+                Repaint();
+            }
+        }
+
+        protected virtual void OnDisable()
+        {
+            //DesignerObjectsHandler.OnDesignerModeChanged -= DesignerModeChanged;
+            state.Disable();
+        }
 
         public sealed override void OnInspectorGUI() => state.OnGUI();
 
@@ -53,7 +76,7 @@ namespace DartsGames.Editors
         public virtual void Disable() { }
         #endregion
 
-        protected virtual bool CanSerializeField(FieldInfo fieldInfo) => true;
-        protected virtual bool CanSerializeMethod(MethodInfo methodInfo) => true;
+        private bool DesignerFieldCheck(FieldInfo fieldInfo) => true;//!DesignerObjectsHandler.DesignerMode || Attribute.IsDefined(fieldInfo, typeof(DesignerFieldAttribute));
+        private bool DesignerMethodCheck(MethodInfo methodInfo) => true;//!DesignerObjectsHandler.DesignerMode || Attribute.IsDefined(methodInfo, typeof(DesignerMethodAttribute));
     }
 }

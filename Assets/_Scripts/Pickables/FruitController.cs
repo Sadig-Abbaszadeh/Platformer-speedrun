@@ -15,7 +15,6 @@ public class FruitController : InteractableObject, ISplitObject
 
     public void SetState(bool active)
     {
-        Debug.Log("me");
         mainBody.SetActive(active);
         pickupAnimBody.SetActive(!active);
     }

@@ -8,13 +8,10 @@ public class FunctionalityTester : MonoBehaviour
     [InspectorButton]
     private void Respawn()
     {
+        // TODO respawn -1 check
         FindObjectOfType<CharController>().transform.position =
-            CheckPoint.All[CheckPoint.LatestCheckpoint].transform.position;
+            CheckPoint.GetLastCheckpointPosition();
 
-        for(int i = CheckPoint.LatestCheckpoint; i <= CheckPoint.LatestAreaEntered; i++)
-        {
-            foreach (var o in CheckPoint.All[i].Objects)
-                o.SetState(true);
-        }
+        CheckPoint.SetActivateCheckpointObjects();
     }
 }

@@ -68,6 +68,7 @@ public class PlayerMovement : MonoBehaviour
         {
             doubleJumped = true;
 
+            rb.velocity = new Vector2(rb.velocity.x, 0);
             rb.AddForce(Vector2.up * doubleJumpForce, ForceMode2D.Impulse);
             playerAnimator.SetTrigger(AnimParameters.doubleJump);
         }

@@ -1,20 +1,18 @@
 ﻿using DartsGames;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
-public class CheckPoint : InteractableObject
+public abstract class CheckPoint : InteractableObject
 {
-    // ??
-    public static CheckPoint CurrentCheckpoint { get; private set; } = null;
-
     private static int _lastCheck = -1,
         _lastArea = -1;
 
     public static int LatestCheckpoint
     {
         get => _lastCheck;
-        private set
+        protected set
         {
             if (value > _lastCheck)
                 _lastCheck = value;
@@ -24,48 +22,88 @@ public class CheckPoint : InteractableObject
     public static int LatestAreaEntered
     {
         get => _lastArea;
-        private set
+        protected set
         {
             if (value > _lastArea)
                 _lastArea = value;
         }
     }
 
-    public static CheckPoint[] All;
-
-    [SerializeField]
-    protected Animator poleAnimator;
+    private static List<CheckPoint> All = new List<CheckPoint>();
 
     [HideInInspector, NonSerialized]
-    public List<ISplitObject> Objects = new List<ISplitObject>();
-    [HideInInspector, NonSerialized]
-    public int index;
+    protected List<ISplitObject> Objects = new List<ISplitObject>();
 
-    protected bool checkpointEntered = false, areaEntered = false;
+    protected int index;
 
-    public void SetAreaEntered()
+    public static void SetCheckpointObjects(List<ISplitObject> splitObjects)
     {
-        if (areaEntered) return;
+        if (All.Count <= 0) return;
 
-        areaEntered = true;
+        splitObjects = splitObjects.OrderBy(s => s._Transform.position.x).ToList();
 
-        LatestAreaEntered = index;
+        if (splitObjects.Count <= 0) return;
+
+        var index = 0;
+        CheckPoint c;
+        float left, right;
+
+        (c, left, right) = GetCheckpointThresholds(index);
+
+        for (int i = 0; i < splitObjects.Count; i++)
+        {
+            var pos = splitObjects[i]._Transform.position.x;
+
+            if (pos >= left && pos < right)
+                c.Objects.Add(splitObjects[i]);
+            else if (pos >= right)
+            {
+                index++;
+                (c, left, right) = GetCheckpointThresholds(index);
+
+                if (c == null)
+                    return;
+            }
+        }
     }
 
-    private void SetCheckpointEntered()
+    private static (CheckPoint, float, float) GetCheckpointThresholds(int index)
     {
-        if (checkpointEntered) return;
+        CheckPoint c;
+        float left, right;
 
-        checkpointEntered = true;
-        poleAnimator.Play(AnimParameters.checkpointActivationAnim);
+        if (All.Count > index)
+        {
+            c = All[index];
+            left = c.transform.position.x;
 
-        LatestCheckpoint = index;
+            if (All.Count > index + 1)
+            {
+                right = All[index + 1].transform.position.x;
+            }
+            else
+            {
+                right = float.MaxValue;
+            }
+
+            return (c, left, right);
+        }
+        else
+            return (null, 0, 0);
     }
 
-    protected override void OnInteract(Collider2D collision)
-    {
-        base.OnInteract(collision);
+    public static Vector3 GetLastCheckpointPosition() => All[LatestCheckpoint].transform.position;
 
-        SetCheckpointEntered();
+    public static void SetActivateCheckpointObjects()
+    {
+        for (int i = LatestCheckpoint; i <= LatestAreaEntered; i++)
+            foreach (var o in All[i].Objects)
+                o.SetState(true);
+    }
+
+    protected virtual void Awake()
+    {
+        index = All.Count;
+        All.Add(this);
     }
 }

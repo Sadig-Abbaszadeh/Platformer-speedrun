@@ -4,7 +4,7 @@ using UnityEngine;
 public class Checkpoint_AreaControl : InteractableObject
 {
     [SerializeField]
-    private CheckPoint checkPoint;
+    private LevelCheckpoint checkPoint;
 
     protected override void OnInteract(Collider2D collision)
     {
