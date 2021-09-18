@@ -1,11 +1,11 @@
 ﻿using System;
 using UnityEngine;
+using DartsGames;
 
 public class TopJumpChecker : InteractableObject
 {
     [SerializeField]
-    // TODO serialize interface instead
-    private CharController charController;
+    private TopJumperWrap topJumperWrap;
 
     protected override void OnInteract(Collider2D collision)
     {
@@ -14,7 +14,7 @@ public class TopJumpChecker : InteractableObject
 
         if (collision.TryGetComponent<ITopJumpable>(out var topJumpable))
         {
-            topJumpable.OnCharacterJumpedOnThis(charController);
+            topJumpable.OnCharacterJumpedOnThis(topJumperWrap.value);
         }
     }
 }

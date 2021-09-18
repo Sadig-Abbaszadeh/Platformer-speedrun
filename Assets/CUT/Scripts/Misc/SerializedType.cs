@@ -3,8 +3,7 @@
 namespace DartsGames
 {
     /// <summary>
-    /// A wrapper class to serialize interfaces (mainly). Inherit using ur interface as T. You can also make that class inherit
-    /// from that interface, and make the methods call the actual methods from the interface for ease of use of the wrapper class
+    /// A wrapper class to serialize interfaces (mainly). Inherit using ur interface as T.
     /// </summary>
     [System.Serializable]
     public class SerializedType<T> : ISerializationCallbackReceiver
@@ -23,6 +22,8 @@ namespace DartsGames
         {
             if (c is T t)
                 value = t;
+            else
+                Debug.Log("Error: serialized component is not of type " + typeof(T));
         }
     }
 }
